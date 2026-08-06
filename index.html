@@ -133,22 +133,10 @@
     white-space:nowrap;vertical-align:top;padding:3px 8px 3px 0;
   }
   .pop-tbl td{padding:3px 0;vertical-align:top}
-  /* 本編の映像は公式 YouTube を埋め込む。まずは軽いサムネだけ置いて、押されたら再生する。 */
-  .pop-video{position:relative;margin:0 0 10px;border-radius:10px;overflow:hidden;background:#000;aspect-ratio:16/9}
-  .pop-video iframe,.pop-video button{position:absolute;inset:0;width:100%;height:100%;border:0}
-  .pop-video button{
-    padding:0;cursor:pointer;background-size:cover;background-position:center;
-    display:flex;align-items:flex-end;justify-content:flex-start;
-  }
-  .pop-video .play{
-    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
-    width:44px;height:44px;border-radius:50%;background:#000000a6;color:#fff;
-    display:flex;align-items:center;justify-content:center;font-size:15px;padding-left:3px;
-  }
-  .pop-video .cap{
-    position:relative;width:100%;padding:14px 8px 5px;font-size:10px;color:#fff;text-align:left;
-    background:linear-gradient(#0000,#000000cc);
-  }
+  /* 本編の一場面。テレ東公式が YouTube で公開している回の画像を、動画へのリンク付きで出す。 */
+  .pop-shot{display:block;margin:0 0 11px;text-decoration:none}
+  .pop-shot img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:10px;background:#000}
+  .pop-shot .cap{display:block;margin-top:4px;font-size:10px;color:var(--muted)}
   .ep-link{color:var(--accent);text-decoration:none;border-bottom:1px solid #c4531f66}
   .ep-link .ext{
     font-size:9.5px;margin-left:5px;padding:1px 5px;border-radius:4px;
@@ -287,10 +275,13 @@
     h += "</div>";
 
     if (s.video) {
-      h += '<div class="pop-video"><button type="button" data-video="' + esc(s.video) + '"'
-         + ' style="background-image:url(https://i.ytimg.com/vi/' + esc(s.video) + '/mqdefault.jpg)">'
-         + '<span class="play">▶</span>'
-         + '<span class="cap">本編の映像を見る（テレ東公式）</span></button></div>';
+      var v = esc(s.video);
+      // 高解像度が無い動画があるので、無ければ 16:9 の既定サムネに落とす
+      h += '<a class="pop-shot" href="https://www.youtube.com/watch?v=' + v + '"'
+         + ' target="_blank" rel="noopener">'
+         + '<img alt="この回の一場面" data-yt="' + v + '"'
+         + ' src="https://i.ytimg.com/vi/' + v + '/maxresdefault.jpg">'
+         + '<span class="cap">この回の一場面（テレビ東京 公式）↗</span></a>';
     }
 
     h += '<table class="pop-tbl">';
@@ -441,17 +432,22 @@
     render();
   }
 
-  // サムネが押されたら、そこではじめてプレイヤーを読み込む
-  document.addEventListener("click", function (ev) {
-    var btn = ev.target.closest && ev.target.closest(".pop-video button[data-video]");
-    if (!btn) return;
-    var id = btn.dataset.video;
-    var frame = document.createElement("iframe");
-    frame.src = "https://www.youtube-nocookie.com/embed/" + id + "?autoplay=1&rel=0";
-    frame.allow = "accelerometer; autoplay; encrypted-media; picture-in-picture";
-    frame.allowFullscreen = true;
-    frame.title = "本編の映像（テレビ東京 公式）";
-    btn.replaceWith(frame);
+  // 高解像度版が無い動画では、YouTube は 404 ではなく 120x90 の代替画像を返してくる。
+  // 読み込めた画像が小さすぎたら、必ず存在する 16:9 のサムネに差し替える。
+  map.on("popupopen", function (e) {
+    var img = e.popup.getElement().querySelector(".pop-shot img[data-yt]");
+    if (!img) return;
+    var swap = function () {
+      if (img.naturalWidth && img.naturalWidth < 200) {
+        img.src = "https://i.ytimg.com/vi/" + img.dataset.yt + "/mqdefault.jpg";
+      }
+      img.removeAttribute("data-yt");
+    };
+    if (img.complete) swap();
+    else {
+      img.addEventListener("load", swap, { once: true });
+      img.addEventListener("error", swap, { once: true });
+    }
   });
 
   $("toggle").onclick = function () { setPanel(!$("panel").classList.contains("open")); };
