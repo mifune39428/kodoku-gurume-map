@@ -234,8 +234,7 @@
                        "#1f6f78","#a3502f","#5a4b9c","#7a7d24","#b03a3a"];
   var SP_COLOR = "#6b625a";
 
-  var map = L.map("map", { zoomControl: false, tap: true })
-             .setView([35.68, 139.75], 11);
+  var map = L.map("map", { zoomControl: false }).setView([35.68, 139.75], 11);
   L.control.zoom({ position: "bottomleft" }).addTo(map);
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
@@ -343,13 +342,50 @@
     return true;
   }
 
-  function render() {
-    var shown = shops.filter(matches);
+  // クラスタを作り直すと開いているポップアップごと消えてしまうので、
+  // 絞り込みが実際に変わったときだけマーカーを入れ替える。
+  var shown = [], lastFilter = null;
+
+  function applyFilter() {
+    var key = JSON.stringify([active.q, active.statuses, active.seasons]);
+    if (key === lastFilter) return;
+    lastFilter = key;
+
+    var openShop = null;
+    for (var i = 0; i < shops.length; i++) {
+      if (shops[i]._marker && shops[i]._marker.isPopupOpen()) { openShop = shops[i]; break; }
+    }
+
+    shown = shops.filter(matches);
     cluster.clearLayers();
     cluster.addLayers(shown.map(function (s) { return s._marker; }));
     $("count").textContent = shown.length + " / " + shops.length + " 店を表示中";
     $("listCount").textContent = "(" + shown.length + ")";
 
+    // 絞り込み後も残っている店なら、開いていたポップアップを開き直す
+    if (openShop && shown.indexOf(openShop) !== -1) {
+      openShop._marker.openPopup();
+    }
+    renderList();
+  }
+
+  // リストから店を選んだとき。地図が落ち着いてからポップアップを開く。
+  // クラスタに畳まれたままだと開けないので、その場合はほどけるのを待つ。
+  function focusShop(s) {
+    setPanel(false);
+    var done = false;
+    var open = function () {
+      if (done) return;
+      done = true;
+      if (s._marker._map) s._marker.openPopup();
+      else cluster.zoomToShowLayer(s._marker, function () { s._marker.openPopup(); });
+    };
+    map.once("moveend", open);
+    map.setView([s.lat, s.lng], Math.max(map.getZoom(), 17), { animate: true });
+    setTimeout(open, 700);   // 地図が動かなかったときの保険
+  }
+
+  function renderList() {
     var center = map.getCenter();
     var sorted = shown.slice().sort(function (a, b) {
       return (Math.pow(a.lat - center.lat, 2) + Math.pow(a.lng - center.lng, 2))
@@ -366,18 +402,14 @@
         + '<span class="m">' + esc(episodeLabel(s))
         + (s.holiday ? "・定休日 " + esc(s.holiday) : "・定休日 未確認") + "</span></span>"
         + '<span class="d">' + (s.status === "open" ? "" : esc((STATUS[s.status] || {}).label)) + "</span>";
-      b.onclick = function () {
-        setPanel(false);
-        map.setView([s.lat, s.lng], Math.max(map.getZoom(), 17), { animate: true });
-        setTimeout(function () { s._marker.openPopup(); }, 350);
-      };
+      b.onclick = function () { focusShop(s); };
       list.appendChild(b);
     });
   }
 
   function setPanel(open) {
     $("panel").classList.toggle("open", open);
-    if (open) render();   // リストは地図の中心から近い順なので開くたびに並べ直す
+    if (open) renderList();   // リストは地図の中心から近い順なので開くたびに並べ直す
   }
 
   function paint(el, on) {
@@ -396,7 +428,7 @@
       el.onclick = function () {
         active.statuses[k] = !active.statuses[k];
         paint(el, active.statuses[k]);
-        render();
+        applyFilter();
       };
       sc.appendChild(el);
     });
@@ -417,7 +449,7 @@
         }
         active.seasons[name] = !active.seasons[name];
         paint(el, active.seasons[name]);
-        render();
+        applyFilter();
       };
       box.appendChild(el);
     });
@@ -429,7 +461,7 @@
     [].forEach.call(document.querySelectorAll("#seasonChips .chip"), function (el) {
       paint(el, active.seasons[el.dataset.season]);
     });
-    render();
+    applyFilter();
   }
 
   // 高解像度版が無い動画では、YouTube は 404 ではなく 120x90 の代替画像を返してくる。
@@ -455,14 +487,15 @@
   $("selAll").onclick  = function () { setSeasons(function () { return true; }); };
   $("selNone").onclick = function () { setSeasons(function () { return false; }); };
   $("selDrama").onclick = function () { setSeasons(function (n) { return /^Season/.test(n); }); };
-  $("q").oninput = function () { active.q = this.value.trim().toLowerCase(); render(); };
+  $("q").oninput = function () { active.q = this.value.trim().toLowerCase(); applyFilter(); };
   $("locate").onclick = function () { map.locate({ setView: true, maxZoom: 15 }); };
   map.on("locationfound", function (e) {
     L.circleMarker(e.latlng, { radius: 7, color: "#fff", weight: 2, fillColor: "#2f7d5c", fillOpacity: 1 })
      .addTo(map).bindPopup("現在地");
   });
   map.on("locationerror", function () { alert("現在地を取得できませんでした。"); });
-  map.on("moveend", function () { if ($("panel").classList.contains("open")) render(); });
+  // 地図を動かしてもマーカーは作り直さない。作り直すと開いているポップアップが消える。
+  map.on("moveend", function () { if ($("panel").classList.contains("open")) renderList(); });
 
   fetch("shops.json?v=1").then(function (r) { return r.json(); }).then(function (data) {
     shops = data;
@@ -484,7 +517,7 @@
 
     shops.forEach(makeMarker);
     buildChips();
-    render();
+    applyFilter();
 
     // 全店が入る範囲だと世界地図になってしまうので、店が一番密集する東京23区から始める。
     var core = shops.filter(function (s) {
@@ -495,7 +528,7 @@
         L.latLngBounds(core.map(function (s) { return [s.lat, s.lng]; })).pad(0.05),
         { animate: false, maxZoom: 13 }
       );
-      render();
+      renderList();
     }
   }).catch(function (e) {
     $("count").textContent = "データを読み込めませんでした";
