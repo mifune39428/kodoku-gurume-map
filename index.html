@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover">
+<title>孤独のグルメ マップ</title>
+<meta name="description" content="ドラマ『孤独のグルメ』に登場した実在のお店を地図上にまとめました。">
+<meta name="theme-color" content="#1c1a17">
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link rel="stylesheet" href="vendor/markercluster.css">
+<link rel="stylesheet" href="vendor/markercluster-default.css">
+<style>
+  :root{
+    --bg:#faf7f2; --panel:#fffdfa; --ink:#241f1a; --muted:#6f645a;
+    --line:#e4dbcf; --accent:#c4531f; --accent-ink:#fff;
+    --shadow:0 6px 24px rgba(60,40,20,.18);
+    --safe-b:env(safe-area-inset-bottom,0px);
+    --safe-t:env(safe-area-inset-top,0px);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
+    color:var(--ink); background:var(--bg);
+    -webkit-text-size-adjust:100%;
+    overscroll-behavior:none;
+  }
+  #map{position:fixed;inset:0;z-index:1;background:#e8e2d8}
+
+  /* ---- 上部バー ---- */
+  header{
+    position:fixed;z-index:1000;top:0;left:0;right:0;
+    padding:calc(var(--safe-t) + 8px) 10px 8px;
+    display:flex;gap:8px;align-items:center;
+    background:linear-gradient(#faf7f2ee,#faf7f2cc 70%,#faf7f200);
+    pointer-events:none;
+  }
+  header>*{pointer-events:auto}
+  .brand{
+    display:flex;flex-direction:column;line-height:1.15;
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:7px 11px;box-shadow:var(--shadow);
+  }
+  .brand b{font-size:15px;letter-spacing:.01em}
+  .brand span{font-size:11px;color:var(--muted);margin-top:2px}
+  .btn{
+    appearance:none;border:1px solid var(--line);background:var(--panel);
+    color:var(--ink);border-radius:12px;padding:9px 13px;font-size:14px;
+    font-family:inherit;box-shadow:var(--shadow);cursor:pointer;white-space:nowrap;
+    min-height:42px;
+  }
+  .btn:active{transform:translateY(1px)}
+  .btn.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+  .spacer{flex:1}
+
+  /* ---- 下部パネル ---- */
+  #panel{
+    position:fixed;z-index:1001;left:0;right:0;bottom:0;
+    max-height:min(76vh,620px);
+    background:var(--panel);border-top:1px solid var(--line);
+    border-radius:18px 18px 0 0;box-shadow:0 -8px 30px rgba(60,40,20,.2);
+    transform:translateY(calc(100% - 0px));
+    transition:transform .28s cubic-bezier(.32,.72,0,1);
+    display:flex;flex-direction:column;
+    padding-bottom:var(--safe-b);
+  }
+  #panel.open{transform:translateY(0)}
+  .grip{padding:10px 0 4px;text-align:center;flex:none;cursor:pointer}
+  .grip i{display:inline-block;width:38px;height:4px;border-radius:2px;background:#d8cfc2}
+  .panel-body{overflow-y:auto;-webkit-overflow-scrolling:touch;padding:4px 14px 16px}
+  .row{display:flex;gap:8px;align-items:center;margin:10px 0}
+  input[type=search]{
+    flex:1;min-width:0;font:inherit;font-size:16px;padding:10px 12px;
+    border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);
+  }
+  h2{font-size:12px;letter-spacing:.08em;color:var(--muted);margin:16px 0 8px;font-weight:600}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{
+    font-size:12.5px;padding:7px 10px;border-radius:999px;cursor:pointer;
+    border:1px solid var(--line);background:#fff;color:var(--muted);
+    display:flex;align-items:center;gap:6px;user-select:none;
+  }
+  .chip .dot{width:9px;height:9px;border-radius:50%;flex:none;box-shadow:0 0 0 1px #0002 inset}
+  .chip.on{color:#fff;border-color:transparent;background:var(--ink)}
+  .chip.on .dot{background:#fff !important;box-shadow:none}
+  .chip.mini{padding:6px 11px;background:#fff;color:var(--muted);border-color:var(--line)}
+  .chip.mini:active{background:#efe8dd}
+  .toggles{display:flex;flex-wrap:wrap;gap:6px}
+  .note{font-size:11.5px;color:var(--muted);line-height:1.6;margin-top:14px}
+  .note a{color:var(--accent)}
+
+  /* ---- リスト ---- */
+  .list{margin-top:6px;border-top:1px solid var(--line)}
+  .item{
+    width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);
+    padding:11px 2px;display:flex;gap:10px;align-items:flex-start;font:inherit;cursor:pointer;
+  }
+  .item:active{background:#f3ede4}
+  .item .dot{width:10px;height:10px;border-radius:50%;margin-top:5px;flex:none}
+  .item .t{flex:1;min-width:0}
+  .item .n{font-size:14.5px;font-weight:600;display:block}
+  .item .m{font-size:11.5px;color:var(--muted);margin-top:2px;display:block}
+  .item .d{font-size:11px;color:var(--muted);flex:none;padding-top:2px}
+  .closed .n{text-decoration:line-through;color:var(--muted)}
+
+  /* ---- マーカー ---- */
+  .pin{
+    width:24px;height:24px;border-radius:50% 50% 50% 6px;transform:rotate(-45deg);
+    border:2px solid #fff;box-shadow:0 2px 5px rgba(0,0,0,.35);
+  }
+  .pin.s-closed{background:#9a938b !important;opacity:.85}
+  .pin.s-closed::after{
+    content:"";position:absolute;left:3px;right:3px;top:10px;height:2px;
+    background:#fff;transform:rotate(45deg);
+  }
+  .pin.s-moved{box-shadow:0 0 0 3px #ffffffcc,0 2px 5px rgba(0,0,0,.35)}
+  .marker-cluster{background:#c4531f55}
+  .marker-cluster div{background:#c4531f;color:#fff;font-weight:600;font-family:inherit}
+
+  /* ---- ポップアップ ---- */
+  .leaflet-popup-content-wrapper{border-radius:14px;box-shadow:var(--shadow)}
+  .leaflet-popup-content{margin:14px 15px;width:250px !important;font-size:13px;line-height:1.55}
+  .pop-name{font-size:16px;font-weight:700;margin:0 0 2px;line-height:1.3}
+  .pop-badges{display:flex;flex-wrap:wrap;gap:5px;margin:7px 0 9px}
+  .badge{font-size:10.5px;padding:3px 7px;border-radius:999px;background:#efe8dd;color:#5c5148;white-space:nowrap}
+  .badge.b-season{color:#fff}
+  .badge.b-closed{background:#8d8781;color:#fff}
+  .badge.b-moved{background:#3d6ea8;color:#fff}
+  .badge.b-hiatus{background:#a8823d;color:#fff}
+  .pop-tbl{width:100%;border-collapse:collapse}
+  .pop-tbl th{
+    text-align:left;font-weight:600;color:var(--muted);font-size:11px;
+    white-space:nowrap;vertical-align:top;padding:3px 8px 3px 0;
+  }
+  .pop-tbl td{padding:3px 0;vertical-align:top}
+  .pop-menu{margin:8px 0 0;padding:8px 10px;background:#f6f1e8;border-radius:9px;font-size:12px}
+  .pop-menu b{display:block;font-size:10.5px;color:var(--muted);margin-bottom:3px;letter-spacing:.04em}
+  .pop-menu ul{margin:0;padding-left:1.1em}
+  .pop-links{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}
+  .pop-links a{
+    font-size:12px;text-decoration:none;padding:7px 10px;border-radius:9px;
+    background:var(--accent);color:#fff;
+  }
+  .pop-links a.ghost{background:#efe8dd;color:#4c433c}
+  .warn{font-size:11px;color:#9a5a2a;margin-top:8px}
+
+  @media (min-width:760px){
+    #panel{left:auto;right:14px;bottom:14px;width:390px;border-radius:18px;
+           max-height:calc(100vh - 110px);border:1px solid var(--line)}
+    #panel:not(.open){transform:translateY(calc(100% + 20px))}
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--bg:#191613;--panel:#221e1a;--ink:#f2ece4;--muted:#a89c90;--line:#3a332c;
+          --shadow:0 6px 24px rgba(0,0,0,.5)}
+    header{background:linear-gradient(#191613ee,#191613cc 70%,#19161300)}
+    input[type=search],.chip,.chip.mini{background:#2c2721;color:var(--ink);border-color:var(--line)}
+    .chip.mini:active{background:#3a332c}
+    .item:active{background:#2c2721}
+    .badge{background:#3a332c;color:#d6cabb}
+    .pop-menu{background:#2c2721}
+    .pop-links a.ghost{background:#3a332c;color:#e6dccf}
+    .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--panel);color:var(--ink)}
+  }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<header>
+  <div class="brand">
+    <b>孤独のグルメ マップ</b>
+    <span id="count">読み込み中…</span>
+  </div>
+  <div class="spacer"></div>
+  <button class="btn" id="locate" title="現在地">📍</button>
+  <button class="btn" id="toggle">絞り込み</button>
+</header>
+
+<div id="panel">
+  <div class="grip" id="grip"><i></i></div>
+  <div class="panel-body">
+    <div class="row">
+      <input type="search" id="q" placeholder="店名・地名・料理で検索" autocomplete="off">
+    </div>
+
+    <h2>営業状況</h2>
+    <div class="toggles" id="statusChips"></div>
+
+    <h2>シーズン</h2>
+    <div class="row" style="margin:0 0 8px">
+      <span class="chip mini" id="selAll">すべて選択</span>
+      <span class="chip mini" id="selNone">すべて解除</span>
+      <span class="chip mini" id="selDrama">連続ドラマだけ</span>
+    </div>
+    <div class="chips" id="seasonChips"></div>
+
+    <h2>表示中のお店 <span id="listCount"></span></h2>
+    <div class="list" id="list"></div>
+
+    <p class="note">
+      店舗情報は公開されているファンサイト等をもとに機械的に集めたものです。
+      定休日・営業時間は変わることがあるので、お出かけ前に公式情報でご確認ください。
+      「未確認」は出典に記載が見つからなかったものです。<br>
+      地図：<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a>
+    </p>
+  </div>
+</div>
+
+<script src="vendor/leaflet.js"></script>
+<script src="vendor/markercluster.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var STATUS = {
+    open:   { label: "営業中", badge: "",         color: "#2f7d5c" },
+    closed: { label: "閉店",   badge: "b-closed", color: "#8d8781" },
+    moved:  { label: "移転",   badge: "b-moved",  color: "#3d6ea8" },
+    hiatus: { label: "休業中", badge: "b-hiatus", color: "#a8823d" }
+  };
+  // シーズンごとの色。11 色を順に使い、SP はまとめて 1 色。
+  var SEASON_COLORS = ["#c4531f","#2f7d5c","#3d6ea8","#96406e","#8a6d1f","#487a2a",
+                       "#1f6f78","#a3502f","#5a4b9c","#7a7d24","#b03a3a"];
+  var SP_COLOR = "#6b625a";
+
+  var map = L.map("map", { zoomControl: false, tap: true })
+             .setView([35.68, 139.75], 11);
+  L.control.zoom({ position: "bottomleft" }).addTo(map);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+  }).addTo(map);
+
+  var cluster = L.markerClusterGroup({
+    maxClusterRadius: 45,
+    spiderfyOnMaxZoom: true,
+    showCoverageOnHover: false,
+    disableClusteringAtZoom: 16
+  }).addTo(map);
+
+  var shops = [], seasons = [], colorOf = {};
+  var active = { seasons: null, statuses: { open: true, closed: true, moved: true, hiatus: true }, q: "" };
+
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  };
+
+  function episodeLabel(s) {
+    if (s.is_sp) return s.season;
+    return s.season + " 第" + s.episode + "話";
+  }
+
+  function popupHtml(s) {
+    var st = STATUS[s.status] || STATUS.open;
+    var h = '<p class="pop-name">' + esc(s.name) + "</p>";
+
+    h += '<div class="pop-badges">';
+    h += '<span class="badge b-season" style="background:' + colorOf[s.season] + '">'
+       + esc(episodeLabel(s)) + "</span>";
+    if (s.status !== "open") h += '<span class="badge ' + st.badge + '">' + st.label + "</span>";
+    h += "</div>";
+
+    h += '<table class="pop-tbl">';
+    if (s.ep_title) h += "<tr><th>サブタイトル</th><td>" + esc(s.ep_title) + "</td></tr>";
+    h += "<tr><th>定休日</th><td>" + (s.holiday ? esc(s.holiday) : "<em>未確認</em>") + "</td></tr>";
+    if (s.hours)   h += "<tr><th>営業時間</th><td>" + esc(s.hours) + "</td></tr>";
+    if (s.address) h += "<tr><th>住所</th><td>" + esc(s.address) + "</td></tr>";
+    if (s.tel)     h += "<tr><th>電話</th><td><a href=\"tel:" + esc(s.tel) + '">' + esc(s.tel) + "</a></td></tr>";
+    h += "</table>";
+
+    if (s.menu && s.menu.length) {
+      h += '<div class="pop-menu"><b>五郎さんの注文</b><ul>';
+      s.menu.forEach(function (m) { h += "<li>" + esc(m) + "</li>"; });
+      h += "</ul></div>";
+    }
+    if (s.status_note) h += '<p class="warn">※ ' + esc(s.status_note) + "</p>";
+
+    var q = encodeURIComponent(s.name + " " + (s.address || ""));
+    h += '<div class="pop-links">'
+       + '<a href="https://www.google.com/maps/search/?api=1&query=' + q + '" target="_blank" rel="noopener">Googleマップ</a>'
+       + '<a class="ghost" href="https://maps.apple.com/?q=' + q + "&ll=" + s.lat + "," + s.lng + '">Appleマップ</a>'
+       + (s.tabelog ? '<a class="ghost" href="' + esc(s.tabelog) + '" target="_blank" rel="noopener">食べログ</a>' : "")
+       + "</div>";
+    return h;
+  }
+
+  function makeMarker(s) {
+    var cls = "pin" + (s.status === "open" ? "" : " s-" + s.status);
+    var icon = L.divIcon({
+      className: "",
+      html: '<div class="' + cls + '" style="background:' + colorOf[s.season] + '"></div>',
+      iconSize: [24, 24], iconAnchor: [12, 22], popupAnchor: [0, -20]
+    });
+    var m = L.marker([s.lat, s.lng], { icon: icon, title: s.name });
+    m.bindPopup(function () { return popupHtml(s); }, { maxWidth: 280, autoPanPadding: [20, 70] });
+    s._marker = m;
+    return m;
+  }
+
+  function matches(s) {
+    if (!active.statuses[s.status]) return false;
+    if (active.seasons && !active.seasons[s.season]) return false;
+    if (active.q) {
+      var hay = [s.name, s.season, s.ep_title, s.address, (s.menu || []).join(" ")].join(" ").toLowerCase();
+      if (hay.indexOf(active.q) === -1) return false;
+    }
+    return true;
+  }
+
+  function render() {
+    var shown = shops.filter(matches);
+    cluster.clearLayers();
+    cluster.addLayers(shown.map(function (s) { return s._marker; }));
+    $("count").textContent = shown.length + " / " + shops.length + " 店を表示中";
+    $("listCount").textContent = "(" + shown.length + ")";
+
+    var center = map.getCenter();
+    var sorted = shown.slice().sort(function (a, b) {
+      return (Math.pow(a.lat - center.lat, 2) + Math.pow(a.lng - center.lng, 2))
+           - (Math.pow(b.lat - center.lat, 2) + Math.pow(b.lng - center.lng, 2));
+    }).slice(0, 60);
+
+    var list = $("list");
+    list.innerHTML = "";
+    sorted.forEach(function (s) {
+      var b = document.createElement("button");
+      b.className = "item" + (s.status === "closed" ? " closed" : "");
+      b.innerHTML = '<span class="dot" style="background:' + colorOf[s.season] + '"></span>'
+        + '<span class="t"><span class="n">' + esc(s.name) + "</span>"
+        + '<span class="m">' + esc(episodeLabel(s))
+        + (s.holiday ? "・定休日 " + esc(s.holiday) : "・定休日 未確認") + "</span></span>"
+        + '<span class="d">' + (s.status === "open" ? "" : esc((STATUS[s.status] || {}).label)) + "</span>";
+      b.onclick = function () {
+        setPanel(false);
+        map.setView([s.lat, s.lng], Math.max(map.getZoom(), 17), { animate: true });
+        setTimeout(function () { s._marker.openPopup(); }, 350);
+      };
+      list.appendChild(b);
+    });
+  }
+
+  function setPanel(open) {
+    $("panel").classList.toggle("open", open);
+    if (open) render();   // リストは地図の中心から近い順なので開くたびに並べ直す
+  }
+
+  function paint(el, on) {
+    el.classList.toggle("on", on);
+    el.style.background = on ? el.dataset.color : "";
+  }
+
+  function buildChips() {
+    var sc = $("statusChips");
+    Object.keys(STATUS).forEach(function (k) {
+      var el = document.createElement("span");
+      el.className = "chip";
+      el.dataset.color = STATUS[k].color;
+      el.innerHTML = '<i class="dot" style="background:' + STATUS[k].color + '"></i>' + STATUS[k].label;
+      paint(el, true);
+      el.onclick = function () {
+        active.statuses[k] = !active.statuses[k];
+        paint(el, active.statuses[k]);
+        render();
+      };
+      sc.appendChild(el);
+    });
+
+    var box = $("seasonChips");
+    seasons.forEach(function (name) {
+      var el = document.createElement("span");
+      el.className = "chip";
+      el.dataset.season = name;
+      el.dataset.color = colorOf[name];
+      el.innerHTML = '<i class="dot" style="background:' + colorOf[name] + '"></i>'
+                   + esc(name.replace(/^大晦日SP /, "大晦日 "));
+      paint(el, true);
+      el.onclick = function () {
+        if (!active.seasons) {
+          active.seasons = {};
+          seasons.forEach(function (n) { active.seasons[n] = true; });
+        }
+        active.seasons[name] = !active.seasons[name];
+        paint(el, active.seasons[name]);
+        render();
+      };
+      box.appendChild(el);
+    });
+  }
+
+  function setSeasons(pred) {
+    active.seasons = {};
+    seasons.forEach(function (n) { active.seasons[n] = pred(n); });
+    [].forEach.call(document.querySelectorAll("#seasonChips .chip"), function (el) {
+      paint(el, active.seasons[el.dataset.season]);
+    });
+    render();
+  }
+
+  $("toggle").onclick = function () { setPanel(!$("panel").classList.contains("open")); };
+  $("grip").onclick   = function () { setPanel(false); };
+  $("selAll").onclick  = function () { setSeasons(function () { return true; }); };
+  $("selNone").onclick = function () { setSeasons(function () { return false; }); };
+  $("selDrama").onclick = function () { setSeasons(function (n) { return /^Season/.test(n); }); };
+  $("q").oninput = function () { active.q = this.value.trim().toLowerCase(); render(); };
+  $("locate").onclick = function () { map.locate({ setView: true, maxZoom: 15 }); };
+  map.on("locationfound", function (e) {
+    L.circleMarker(e.latlng, { radius: 7, color: "#fff", weight: 2, fillColor: "#2f7d5c", fillOpacity: 1 })
+     .addTo(map).bindPopup("現在地");
+  });
+  map.on("locationerror", function () { alert("現在地を取得できませんでした。"); });
+  map.on("moveend", function () { if ($("panel").classList.contains("open")) render(); });
+
+  fetch("shops.json?v=1").then(function (r) { return r.json(); }).then(function (data) {
+    shops = data;
+
+    var order = {};
+    shops.forEach(function (s) {
+      if (!(s.season in order)) order[s.season] = [s.year, s.is_sp ? 1 : 0];
+    });
+    seasons = Object.keys(order).sort(function (a, b) {
+      return order[a][0] - order[b][0] || order[a][1] - order[b][1] || a.localeCompare(b, "ja");
+    });
+
+    var i = 0;
+    seasons.forEach(function (n) {
+      var m = /^Season (\d+)/.exec(n);
+      colorOf[n] = m ? SEASON_COLORS[(+m[1] - 1) % SEASON_COLORS.length]
+                     : (i++, SP_COLOR);
+    });
+
+    shops.forEach(makeMarker);
+    buildChips();
+    render();
+
+    // 全店が入る範囲だと世界地図になってしまうので、店が一番密集する東京23区から始める。
+    var core = shops.filter(function (s) {
+      return s.lat > 35.52 && s.lat < 35.83 && s.lng > 139.58 && s.lng < 139.92;
+    });
+    if (core.length) {
+      map.fitBounds(
+        L.latLngBounds(core.map(function (s) { return [s.lat, s.lng]; })).pad(0.05),
+        { animate: false, maxZoom: 13 }
+      );
+      render();
+    }
+  }).catch(function (e) {
+    $("count").textContent = "データを読み込めませんでした";
+    console.error(e);
+  });
+})();
+</script>
+</body>
+</html>
