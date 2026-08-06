@@ -43,6 +43,23 @@
 index.html      地図本体（HTML/CSS/JS 一体）
 shops.json      店舗データ
 vendor/         Leaflet 1.9.4 + Leaflet.markercluster 1.5.3（CDN 不要）
+tools/          shops.json を作り直すためのスクレイピングスクリプト
 ```
+
+### データを作り直す
+
+`tools/` で以下の順に実行します（出典ページの HTML を同じ階層に置いた状態で）。
+
+```bash
+python3 parse_list.py     # 一覧ページ  → shops_raw.json（閉店フラグ）
+python3 parse_detail.py   # 各詳細ページ → shops_detail.json（住所・定休日・座標）
+python3 parse_status.py   # 全店舗リスト → status_list.json（営業状況）
+python3 parse_s11.py      # Season 11   → s11_shops.json
+python3 build_data.py     # 座標の検証（国土地理院APIと突き合わせ）
+python3 final_build.py    # 統合して shops.json を出力
+```
+
+Season 11 は出典サイトの更新が追いついていないため、`parse_s11.py` で別途取得しています。
+新しいシーズンが始まったら同じ要領で追加してください。
 
 地図タイルは [OpenStreetMap](https://www.openstreetmap.org/copyright) を利用しています。
