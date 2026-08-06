@@ -133,6 +133,11 @@
     white-space:nowrap;vertical-align:top;padding:3px 8px 3px 0;
   }
   .pop-tbl td{padding:3px 0;vertical-align:top}
+  .ep-link{color:var(--accent);text-decoration:none;border-bottom:1px solid #c4531f66}
+  .ep-link .ext{
+    font-size:9.5px;margin-left:5px;padding:1px 5px;border-radius:4px;
+    background:#c4531f1f;border-bottom:0;white-space:nowrap;
+  }
   .pop-menu{margin:8px 0 0;padding:8px 10px;background:#f6f1e8;border-radius:9px;font-size:12px}
   .pop-menu b{display:block;font-size:10.5px;color:var(--muted);margin-bottom:3px;letter-spacing:.04em}
   .pop-menu ul{margin:0;padding-left:1.1em}
@@ -158,6 +163,8 @@
     .item:active{background:#2c2721}
     .badge{background:#3a332c;color:#d6cabb}
     .pop-menu{background:#2c2721}
+    .ep-link{color:#e8814f;border-bottom-color:#e8814f66}
+    .ep-link .ext{background:#e8814f26}
     .pop-links a.ghost{background:#3a332c;color:#e6dccf}
     .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--panel);color:var(--ink)}
   }
@@ -264,7 +271,15 @@
     h += "</div>";
 
     h += '<table class="pop-tbl">';
-    if (s.ep_title) h += "<tr><th>サブタイトル</th><td>" + esc(s.ep_title) + "</td></tr>";
+    if (s.ep_title) {
+      var sub = esc(s.ep_title);
+      h += "<tr><th>サブタイトル</th><td>"
+         + (s.official
+             ? '<a class="ep-link" href="' + esc(s.official) + '" target="_blank" rel="noopener">'
+               + sub + '<span class="ext">テレ東公式 ↗</span></a>'
+             : sub)
+         + "</td></tr>";
+    }
     h += "<tr><th>定休日</th><td>" + (s.holiday ? esc(s.holiday) : "<em>未確認</em>") + "</td></tr>";
     if (s.hours)   h += "<tr><th>営業時間</th><td>" + esc(s.hours) + "</td></tr>";
     if (s.address) h += "<tr><th>住所</th><td>" + esc(s.address) + "</td></tr>";
@@ -283,6 +298,10 @@
        + '<a href="https://www.google.com/maps/search/?api=1&query=' + q + '" target="_blank" rel="noopener">Googleマップ</a>'
        + '<a class="ghost" href="https://maps.apple.com/?q=' + q + "&ll=" + s.lat + "," + s.lng + '">Appleマップ</a>'
        + (s.tabelog ? '<a class="ghost" href="' + esc(s.tabelog) + '" target="_blank" rel="noopener">食べログ</a>' : "")
+       // サブタイトルが無い回は、リンクの行から公式ページへ行けるようにする
+       + (s.official && !s.ep_title
+            ? '<a class="ghost" href="' + esc(s.official) + '" target="_blank" rel="noopener">テレ東公式</a>'
+            : "")
        + "</div>";
     return h;
   }
