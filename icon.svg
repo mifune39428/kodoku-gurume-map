@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="0" fill="#1c1a17"/>
+  <!-- 地図のピン -->
+  <path d="M256 84c-62 0-112 50-112 112 0 78 92 168 106 181a9 9 0 0 0 12 0c14-13 106-103 106-181 0-62-50-112-112-112z"
+        fill="#c4531f"/>
+  <!-- どんぶり -->
+  <path d="M188 186h136c0 38-30 68-68 68s-68-30-68-68z" fill="#fffaf3"/>
+  <rect x="176" y="176" width="160" height="13" rx="6.5" fill="#fffaf3"/>
+  <!-- 湯気 -->
+  <path d="M228 148c0-14 12-14 12-28s-12-14-12-28" stroke="#fffaf3" stroke-width="11"
+        stroke-linecap="round" fill="none" opacity=".9"/>
+  <path d="M272 152c0-12 11-12 11-25s-11-12-11-25" stroke="#fffaf3" stroke-width="11"
+        stroke-linecap="round" fill="none" opacity=".65"/>
+</svg>

@@ -1,0 +1,16 @@
+{
+  "name": "孤独のグルメ マップ",
+  "short_name": "孤独のグルメ",
+  "description": "ドラマ『孤独のグルメ』に登場した実在のお店の地図",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1c1a17",
+  "theme_color": "#1c1a17",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

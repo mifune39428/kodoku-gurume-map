@@ -6,6 +6,13 @@
 <title>孤独のグルメ マップ</title>
 <meta name="description" content="ドラマ『孤独のグルメ』に登場した実在のお店を地図上にまとめました。">
 <meta name="theme-color" content="#1c1a17">
+<!-- ホーム画面に追加すると Safari の上下のバーが無い状態で開ける -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="孤独のグルメ">
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="vendor/markercluster.css">
 <link rel="stylesheet" href="vendor/markercluster-default.css">
@@ -52,6 +59,22 @@
   .btn:active{transform:translateY(1px)}
   .btn.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
   .spacer{flex:1}
+
+  /* ---- ホーム画面に追加の案内（iPhone の Safari でだけ出す） ---- */
+  #a2hs{
+    position:fixed;z-index:1002;left:10px;right:10px;
+    top:calc(var(--safe-t) + 62px);
+    display:flex;gap:8px;align-items:center;
+    padding:9px 10px 9px 13px;border-radius:12px;
+    background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);
+    font-size:11.5px;line-height:1.4;color:var(--muted);
+  }
+  #a2hs[hidden]{display:none}
+  #a2hs b{color:var(--accent)}
+  #a2hs button{
+    flex:none;width:28px;height:28px;border-radius:8px;border:0;background:transparent;
+    color:var(--muted);font-size:14px;cursor:pointer;
+  }
 
   /* ---- 下部パネル ---- */
   #panel{
@@ -119,39 +142,40 @@
 
   /* ---- ポップアップ ---- */
   .leaflet-popup-content-wrapper{border-radius:14px;box-shadow:var(--shadow)}
-  .leaflet-popup-content{margin:14px 15px;width:250px !important;font-size:13px;line-height:1.55}
-  .pop-name{font-size:16px;font-weight:700;margin:0 0 2px;line-height:1.3}
-  .pop-badges{display:flex;flex-wrap:wrap;gap:5px;margin:7px 0 9px}
+  .leaflet-popup-content{
+    margin:12px 13px;width:250px !important;font-size:12.5px;line-height:1.45;
+    /* 画面からはみ出すと autoPan が暴れるので、見えている高さに収める */
+    max-height:calc(100vh - var(--pop-reserve, 168px));
+    max-height:calc(100dvh - var(--pop-reserve, 168px));
+    overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  }
+  .pop-name{font-size:15px;font-weight:700;margin:0 0 2px;line-height:1.3}
+  .pop-badges{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0 8px}
   .badge{font-size:10.5px;padding:3px 7px;border-radius:999px;background:#efe8dd;color:#5c5148;white-space:nowrap}
   .badge.b-season{color:#fff}
   .badge.b-closed{background:#8d8781;color:#fff}
   .badge.b-moved{background:#3d6ea8;color:#fff}
   .badge.b-hiatus{background:#a8823d;color:#fff}
+  .pop-sub{margin:0 0 8px;font-size:12.5px;line-height:1.4}
   .pop-tbl{width:100%;border-collapse:collapse}
   .pop-tbl th{
-    text-align:left;font-weight:600;color:var(--muted);font-size:11px;
-    white-space:nowrap;vertical-align:top;padding:3px 8px 3px 0;
+    text-align:left;font-weight:600;color:var(--muted);font-size:10.5px;
+    white-space:nowrap;vertical-align:top;padding:2px 7px 2px 0;
   }
-  .pop-tbl td{padding:3px 0;vertical-align:top}
+  .pop-tbl td{padding:2px 0;vertical-align:top}
+  .pop-tbl .tel{white-space:nowrap}
   /* 本編の一場面。テレ東公式が YouTube で公開している回の画像を、動画へのリンク付きで出す。 */
   .pop-shot{display:block;margin:0 0 11px;text-decoration:none}
   .pop-shot img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:10px;background:#000}
   .pop-shot .cap{display:block;margin-top:4px;font-size:10px;color:var(--muted)}
-  .ep-link{color:var(--accent);text-decoration:none;border-bottom:1px solid #c4531f66}
-  .ep-link .ext{
-    font-size:9.5px;margin-left:5px;padding:1px 5px;border-radius:4px;
-    background:#c4531f1f;border-bottom:0;white-space:nowrap;
-  }
-  .pop-menu{margin:8px 0 0;padding:8px 10px;background:#f6f1e8;border-radius:9px;font-size:12px}
-  .pop-menu b{display:block;font-size:10.5px;color:var(--muted);margin-bottom:3px;letter-spacing:.04em}
-  .pop-menu ul{margin:0;padding-left:1.1em}
-  .pop-links{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}
+  .ep-link{color:var(--accent);text-decoration:none}
+  .pop-links{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
   .pop-links a{
-    font-size:12px;text-decoration:none;padding:7px 10px;border-radius:9px;
+    font-size:11.5px;text-decoration:none;padding:6px 9px;border-radius:8px;
     background:var(--accent);color:#fff;
   }
   .pop-links a.ghost{background:#efe8dd;color:#4c433c}
-  .warn{font-size:11px;color:#9a5a2a;margin-top:8px}
+  .warn{font-size:10.5px;color:#9a5a2a;margin-top:7px}
 
   @media (min-width:760px){
     #panel{left:auto;right:14px;bottom:14px;width:390px;border-radius:18px;
@@ -166,9 +190,7 @@
     .chip.mini:active{background:#3a332c}
     .item:active{background:#2c2721}
     .badge{background:#3a332c;color:#d6cabb}
-    .pop-menu{background:#2c2721}
-    .ep-link{color:#e8814f;border-bottom-color:#e8814f66}
-    .ep-link .ext{background:#e8814f26}
+    .ep-link{color:#e8814f}
     .pop-links a.ghost{background:#3a332c;color:#e6dccf}
     .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--panel);color:var(--ink)}
   }
@@ -186,6 +208,11 @@
   <button class="btn" id="locate" title="現在地">📍</button>
   <button class="btn" id="toggle">絞り込み</button>
 </header>
+
+<div id="a2hs" hidden>
+  <span>下の<b>共有ボタン</b>から<b>「ホーム画面に追加」</b>にすると、アドレスバーが消えて全画面で使えます</span>
+  <button type="button" id="a2hsClose" aria-label="閉じる">✕</button>
+</div>
 
 <div id="panel">
   <div class="grip" id="grip"><i></i></div>
@@ -283,27 +310,31 @@
          + '<span class="cap">この回の一場面（テレビ東京 公式）↗</span></a>';
     }
 
-    h += '<table class="pop-tbl">';
+    // サブタイトルは見出し扱いにして、表の1行ぶんを節約する
     if (s.ep_title) {
       var sub = esc(s.ep_title);
-      h += "<tr><th>サブタイトル</th><td>"
+      h += '<p class="pop-sub">'
          + (s.official
              ? '<a class="ep-link" href="' + esc(s.official) + '" target="_blank" rel="noopener">'
-               + sub + '<span class="ext">テレ東公式 ↗</span></a>'
+               + sub + " ↗</a>"
              : sub)
+         + "</p>";
+    }
+
+    h += '<table class="pop-tbl">';
+    h += "<tr><th>定休日</th><td>" + (s.holiday ? esc(s.holiday) : "<em>未確認</em>") + "</td></tr>";
+    if (s.hours) h += "<tr><th>時間</th><td>" + esc(s.hours) + "</td></tr>";
+    if (s.address) {
+      h += "<tr><th>住所</th><td>" + esc(s.address)
+         + (s.tel ? ' <a class="tel" href="tel:' + esc(s.tel) + '">' + esc(s.tel) + "</a>" : "")
          + "</td></tr>";
     }
-    h += "<tr><th>定休日</th><td>" + (s.holiday ? esc(s.holiday) : "<em>未確認</em>") + "</td></tr>";
-    if (s.hours)   h += "<tr><th>営業時間</th><td>" + esc(s.hours) + "</td></tr>";
-    if (s.address) h += "<tr><th>住所</th><td>" + esc(s.address) + "</td></tr>";
-    if (s.tel)     h += "<tr><th>電話</th><td><a href=\"tel:" + esc(s.tel) + '">' + esc(s.tel) + "</a></td></tr>";
+    if (s.menu && s.menu.length) {
+      h += "<tr><th>注文</th><td>" + esc(s.menu.slice(0, 5).join("・"))
+         + (s.menu.length > 5 ? " ほか" : "") + "</td></tr>";
+    }
     h += "</table>";
 
-    if (s.menu && s.menu.length) {
-      h += '<div class="pop-menu"><b>五郎さんの注文</b><ul>';
-      s.menu.forEach(function (m) { h += "<li>" + esc(m) + "</li>"; });
-      h += "</ul></div>";
-    }
     if (s.status_note) h += '<p class="warn">※ ' + esc(s.status_note) + "</p>";
 
     var q = encodeURIComponent(s.name + " " + (s.address || ""));
@@ -327,7 +358,8 @@
       iconSize: [24, 24], iconAnchor: [12, 22], popupAnchor: [0, -20]
     });
     var m = L.marker([s.lat, s.lng], { icon: icon, title: s.name });
-    m.bindPopup(function () { return popupHtml(s); }, { maxWidth: 280, autoPanPadding: [20, 70] });
+    // autoPan は画像が後から入ると位置がずれるので切って、fitPopup で自前で寄せる
+    m.bindPopup(function () { return popupHtml(s); }, { maxWidth: 280, autoPan: false });
     s._marker = m;
     return m;
   }
@@ -466,14 +498,42 @@
 
   // 高解像度版が無い動画では、YouTube は 404 ではなく 120x90 の代替画像を返してくる。
   // 読み込めた画像が小さすぎたら、必ず存在する 16:9 のサムネに差し替える。
+  // Leaflet の autoPan は、画像が後から入って高さが変わるとずれたままになる。
+  // 実際の位置を測って、はみ出したぶんだけ自分で地図を寄せる。
+  function fitPopup(popup) {
+    var el = popup.getElement();
+    if (!el || !popup.isOpen()) return;
+    var box = map.getContainer().getBoundingClientRect();
+    var r = el.getBoundingClientRect();
+    var hint = $("a2hs");
+    var padTop = hint.hidden ? 68 : hint.getBoundingClientRect().bottom - box.top + 8;
+    var padBottom = 16, padSide = 12, dx = 0, dy = 0;
+    if (r.top < box.top + padTop) dy = r.top - (box.top + padTop);
+    else if (r.bottom > box.bottom - padBottom) {
+      dy = Math.min(r.bottom - (box.bottom - padBottom), r.top - (box.top + padTop));
+    }
+    if (r.left < box.left + padSide) dx = r.left - (box.left + padSide);
+    else if (r.right > box.right - padSide) dx = r.right - (box.right - padSide);
+    if (dx || dy) map.panBy([dx, dy], { animate: true, duration: 0.25 });
+  }
+
   map.on("popupopen", function (e) {
-    var img = e.popup.getElement().querySelector(".pop-shot img[data-yt]");
-    if (!img) return;
+    var popup = e.popup;
+    // 画像が入って高さが変わるので、収まり直しをやり直させる
+    var refit = function () {
+      if (!popup.isOpen()) return;
+      popup.update();
+      setTimeout(function () { fitPopup(popup); }, 30);
+    };
+    var img = popup.getElement().querySelector(".pop-shot img[data-yt]");
+    if (!img) { setTimeout(refit, 60); return; }
     var swap = function () {
       if (img.naturalWidth && img.naturalWidth < 200) {
         img.src = "https://i.ytimg.com/vi/" + img.dataset.yt + "/mqdefault.jpg";
+        img.addEventListener("load", refit, { once: true });
       }
       img.removeAttribute("data-yt");
+      refit();
     };
     if (img.complete) swap();
     else {
@@ -481,6 +541,26 @@
       img.addEventListener("error", swap, { once: true });
     }
   });
+
+  // iPhone の Safari で開いているときだけ、ホーム画面に追加すると全画面になる旨を一度だけ出す
+  (function () {
+    var iOS = /iP(hone|od|ad)/.test(navigator.platform)
+           || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform));
+    var standalone = window.navigator.standalone
+                  || window.matchMedia("(display-mode: standalone)").matches;
+    var hidden = false;
+    try { hidden = localStorage.getItem("a2hs") === "off"; } catch (e) { hidden = false; }
+    if (!iOS || standalone || hidden) return;
+    var bar = $("a2hs");
+    bar.hidden = false;
+    // 案内バーのぶんだけポップアップに使える高さが減る
+    document.documentElement.style.setProperty("--pop-reserve", "220px");
+    $("a2hsClose").onclick = function () {
+      bar.hidden = true;
+      document.documentElement.style.removeProperty("--pop-reserve");
+      try { localStorage.setItem("a2hs", "off"); } catch (e) { /* プライベートモード */ }
+    };
+  })();
 
   $("toggle").onclick = function () { setPanel(!$("panel").classList.contains("open")); };
   $("grip").onclick   = function () { setPanel(false); };
