@@ -137,6 +137,19 @@
     background:#fff;transform:rotate(45deg);
   }
   .pin.s-moved{box-shadow:0 0 0 3px #ffffffcc,0 2px 5px rgba(0,0,0,.35)}
+  /* ---- 行った印（聖地巡礼済） ---- */
+  .vmark{
+    position:absolute;top:-8px;right:-9px;width:16px;height:16px;border-radius:50%;
+    background:#e2a100;color:#fff;font-size:11px;font-weight:700;line-height:16px;text-align:center;
+    box-shadow:0 0 0 2px #fff,0 1px 3px rgba(0,0,0,.4);pointer-events:none;
+  }
+  .visit-btn{
+    display:block;width:100%;margin-top:10px;padding:9px;border-radius:9px;
+    border:1.5px dashed var(--line);background:transparent;color:var(--muted);
+    font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;
+  }
+  .visit-btn.done{border:1.5px solid #e2a100;background:#e2a100;color:#fff}
+  .item .n i{font-style:normal;color:#e2a100;margin-right:3px}
   .marker-cluster{background:#c4531f55}
   .marker-cluster div{background:#c4531f;color:#fff;font-weight:600;font-family:inherit}
 
@@ -221,6 +234,13 @@
       <input type="search" id="q" placeholder="店名・地名・料理で検索" autocomplete="off">
     </div>
 
+    <h2>聖地巡礼</h2>
+    <div class="chips" id="visitChips"></div>
+    <div class="row" style="margin:8px 0 0">
+      <span class="chip mini" id="visitExport">記録を書き出す</span>
+      <span class="chip mini" id="visitImport">記録を読み込む</span>
+    </div>
+
     <h2>営業状況</h2>
     <div class="toggles" id="statusChips"></div>
 
@@ -239,6 +259,7 @@
       店舗情報は公開されているファンサイト等をもとに機械的に集めたものです。
       定休日・営業時間は変わることがあるので、お出かけ前に公式情報でご確認ください。
       「未確認」は出典に記載が見つからなかったものです。<br>
+      <b>行った印</b>はこの端末のブラウザの中だけに保存されます。ログインは不要で、どこにも送信されません。<br>
       地図：<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a>
     </p>
   </div>
@@ -276,7 +297,8 @@
   }).addTo(map);
 
   var shops = [], seasons = [], colorOf = {};
-  var active = { seasons: null, statuses: { open: true, closed: true, moved: true, hiatus: true }, q: "" };
+  var active = { seasons: null, statuses: { open: true, closed: true, moved: true, hiatus: true },
+                 visit: { done: true, todo: true }, q: "" };
 
   var $ = function (id) { return document.getElementById(id); };
   var esc = function (s) {
@@ -288,6 +310,99 @@
   function episodeLabel(s) {
     if (s.is_sp) return s.season;
     return s.season + " 第" + s.episode + "話";
+  }
+
+  // ---- 行った印（聖地巡礼済） ----
+  // この端末のブラウザの中だけに保存する。ログインもサーバーも使わず、どこにも送らない。
+  // 同じ github.io に他の地図も置いているので、保存名は地図ごとに分ける。
+  var VISIT_KEY = "kodoku_visited";
+  var VISIT = {
+    done: { label: "行った", color: "#e2a100" },
+    todo: { label: "まだ",   color: "#6b625a" }
+  };
+  var visited = {};
+  try { visited = JSON.parse(localStorage.getItem(VISIT_KEY)); } catch (e) { visited = null; }
+  if (!visited || typeof visited !== "object" || Array.isArray(visited)) visited = {};
+
+  function isVisited(s) { return Object.prototype.hasOwnProperty.call(visited, s.name); }
+  function saveVisited() {
+    try { localStorage.setItem(VISIT_KEY, JSON.stringify(visited)); return true; }
+    catch (e) { return false; }
+  }
+  function visitLabel(s) {
+    return isVisited(s) ? "✓ 聖地巡礼済（" + visited[s.name] + "）" : "行った印をつける";
+  }
+  function visitBtnHtml(s) {
+    return '<button type="button" class="visit-btn' + (isVisited(s) ? " done" : "")
+         + '" data-visit="' + esc(s.name) + '">' + esc(visitLabel(s)) + "</button>";
+  }
+  function updateCount() {
+    $("count").textContent = shown.length + " / " + shops.length + " 店・巡礼済 "
+                           + shops.filter(isVisited).length;
+  }
+  // 印を付け外ししたあと、ピン・開いているポップアップ・件数・一覧をそろえる
+  function refreshVisited() {
+    // setIcon で差し替えると開いているポップアップが閉じるので、ピンの中身だけ書き換える
+    shops.forEach(function (s) {
+      if (!s._marker) return;
+      var icon = iconFor(s), el = s._marker.getElement();
+      s._marker.options.icon = icon;
+      if (el) el.innerHTML = icon.options.html;
+    });
+    [].forEach.call(document.querySelectorAll(".visit-btn"), function (btn) {
+      var name = btn.getAttribute("data-visit");
+      var s = shops.filter(function (x) { return x.name === name; })[0];
+      if (!s) return;
+      // ボタンを作り直すとポップアップが閉じるので、同じボタンの見た目だけ変える
+      btn.classList.toggle("done", isVisited(s));
+      btn.textContent = visitLabel(s);
+    });
+    updateCount();
+    if ($("panel").classList.contains("open")) renderList();
+  }
+  // ポップアップの中のクリックは Leaflet が外へ伝えないので、伝わる前に受け取る
+  document.addEventListener("click", function (e) {
+    var btn = e.target.closest && e.target.closest(".visit-btn");
+    if (!btn) return;
+    var name = btn.getAttribute("data-visit");
+    if (Object.prototype.hasOwnProperty.call(visited, name)) {
+      if (!confirm("「" + name + "」の行った印を消しますか？")) return;
+      delete visited[name];
+    } else {
+      var t = new Date();
+      visited[name] = t.getFullYear() + "/" + (t.getMonth() + 1) + "/" + t.getDate();
+    }
+    if (!saveVisited()) alert("この画面では印を保存できませんでした（プライベートブラウズ中かもしれません）。");
+    refreshVisited();
+  }, true);
+
+  // 機種変更やブラウザの掃除で消えたときのための控え。文字として書き出し、貼り付けて戻す。
+  function exportVisited() {
+    var text = JSON.stringify(visited);
+    var fallback = function () { prompt("この文字をコピーして、メモなどに保存してください", text); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        alert(Object.keys(visited).length + " 件の記録をコピーしました。メモなどに貼り付けて保存してください。");
+      }, fallback);
+    } else fallback();
+  }
+  function importVisited() {
+    var text = prompt("書き出した文字を貼り付けてください（いまの印に足されます）");
+    if (!text) return;
+    var data = null, n = 0;
+    try { data = JSON.parse(text); } catch (e) { data = null; }
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+      alert("読み込めませんでした。書き出した文字をそのまま貼り付けてください。");
+      return;
+    }
+    Object.keys(data).forEach(function (k) {
+      if (typeof data[k] !== "string") return;
+      visited[k] = data[k].slice(0, 20);
+      n++;
+    });
+    if (!saveVisited()) alert("この画面では印を保存できませんでした（プライベートブラウズ中かもしれません）。");
+    alert(n + " 件読み込みました。");
+    refreshVisited();
   }
 
   function popupHtml(s) {
@@ -347,17 +462,22 @@
             ? '<a class="ghost" href="' + esc(s.official) + '" target="_blank" rel="noopener">テレ東公式</a>'
             : "")
        + "</div>";
+    h += visitBtnHtml(s);
     return h;
   }
 
-  function makeMarker(s) {
+  function iconFor(s) {
     var cls = "pin" + (s.status === "open" ? "" : " s-" + s.status);
-    var icon = L.divIcon({
+    return L.divIcon({
       className: "",
-      html: '<div class="' + cls + '" style="background:' + colorOf[s.season] + '"></div>',
+      html: '<div class="' + cls + '" style="background:' + colorOf[s.season] + '"></div>'
+          + (isVisited(s) ? '<span class="vmark">✓</span>' : ""),
       iconSize: [24, 24], iconAnchor: [12, 22], popupAnchor: [0, -20]
     });
-    var m = L.marker([s.lat, s.lng], { icon: icon, title: s.name });
+  }
+
+  function makeMarker(s) {
+    var m = L.marker([s.lat, s.lng], { icon: iconFor(s), title: s.name });
     // autoPan は画像が後から入ると位置がずれるので切って、fitPopup で自前で寄せる
     m.bindPopup(function () { return popupHtml(s); }, { maxWidth: 280, autoPan: false });
     s._marker = m;
@@ -366,6 +486,7 @@
 
   function matches(s) {
     if (!active.statuses[s.status]) return false;
+    if (!active.visit[isVisited(s) ? "done" : "todo"]) return false;
     if (active.seasons && !active.seasons[s.season]) return false;
     if (active.q) {
       var hay = [s.name, s.season, s.ep_title, s.address, (s.menu || []).join(" ")].join(" ").toLowerCase();
@@ -379,7 +500,7 @@
   var shown = [], lastFilter = null;
 
   function applyFilter() {
-    var key = JSON.stringify([active.q, active.statuses, active.seasons]);
+    var key = JSON.stringify([active.q, active.statuses, active.seasons, active.visit]);
     if (key === lastFilter) return;
     lastFilter = key;
 
@@ -391,7 +512,7 @@
     shown = shops.filter(matches);
     cluster.clearLayers();
     cluster.addLayers(shown.map(function (s) { return s._marker; }));
-    $("count").textContent = shown.length + " / " + shops.length + " 店を表示中";
+    updateCount();
     $("listCount").textContent = "(" + shown.length + ")";
 
     // 絞り込み後も残っている店なら、開いていたポップアップを開き直す
@@ -430,7 +551,7 @@
       var b = document.createElement("button");
       b.className = "item" + (s.status === "closed" ? " closed" : "");
       b.innerHTML = '<span class="dot" style="background:' + colorOf[s.season] + '"></span>'
-        + '<span class="t"><span class="n">' + esc(s.name) + "</span>"
+        + '<span class="t"><span class="n">' + (isVisited(s) ? "<i>✓</i>" : "") + esc(s.name) + "</span>"
         + '<span class="m">' + esc(episodeLabel(s))
         + (s.holiday ? "・定休日 " + esc(s.holiday) : "・定休日 未確認") + "</span></span>"
         + '<span class="d">' + (s.status === "open" ? "" : esc((STATUS[s.status] || {}).label)) + "</span>";
@@ -450,6 +571,21 @@
   }
 
   function buildChips() {
+    var vc = $("visitChips");
+    Object.keys(VISIT).forEach(function (k) {
+      var el = document.createElement("span");
+      el.className = "chip";
+      el.dataset.color = VISIT[k].color;
+      el.innerHTML = '<i class="dot" style="background:' + VISIT[k].color + '"></i>' + VISIT[k].label;
+      paint(el, true);
+      el.onclick = function () {
+        active.visit[k] = !active.visit[k];
+        paint(el, active.visit[k]);
+        applyFilter();
+      };
+      vc.appendChild(el);
+    });
+
     var sc = $("statusChips");
     Object.keys(STATUS).forEach(function (k) {
       var el = document.createElement("span");
@@ -567,6 +703,8 @@
   $("selAll").onclick  = function () { setSeasons(function () { return true; }); };
   $("selNone").onclick = function () { setSeasons(function () { return false; }); };
   $("selDrama").onclick = function () { setSeasons(function (n) { return /^Season/.test(n); }); };
+  $("visitExport").onclick = exportVisited;
+  $("visitImport").onclick = importVisited;
   $("q").oninput = function () { active.q = this.value.trim().toLowerCase(); applyFilter(); };
   $("locate").onclick = function () { map.locate({ setView: true, maxZoom: 15 }); };
   map.on("locationfound", function (e) {
